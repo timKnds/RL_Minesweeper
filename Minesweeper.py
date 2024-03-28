@@ -81,6 +81,7 @@ class Grid:
                 if self.xGrid + x >= 0 and self.xGrid + x < self.game.game_width_height:
                     for y in range(-1, 2):
                         if self.yGrid + y >= 0 and self.yGrid + y < self.game.game_width_height:
+                            self.game.grid[self.yGrid + y][self.xGrid + x].free += 1
                             if not self.game.grid[self.yGrid + y][self.xGrid + x].clicked:
                                 self.game.grid[self.yGrid + y][self.xGrid + x].revealGrid()
             return 10
@@ -133,6 +134,7 @@ class Game:
         self.mines = []
         self.t = 0  # Set time to 0
         pygame.display.set_caption(CAPTION)  # S Set the caption of window
+        self.round_not_clicked = 0
 
     def reset(self):
         self.mine_left = self.numMine
@@ -174,7 +176,13 @@ class Game:
         for i in self.grid:
             for j in i:
                 j.updateValue()
-        # self._update_ui()
+
+        # Reveal the first grid
+        for y in range(self.game_width_height):
+            for x in range(self.game_width_height):
+                if self.grid[y][x].val != -1:
+                    self.grid[y][x].revealGrid()
+                    break
 
     def play_step(self, action):
         self.gameDisplay.fill(self.bg_color)  # Fill the screen with bg color
@@ -182,10 +190,11 @@ class Game:
         reward = 0
         x = action[0]
         y = action[1]
-        left_click = action[2] == 0
-        right_click = action[2] == 1
+        pause = action[2] == 0
+        left_click = action[3] == 0
+        right_click = action[3] == 1
         selected = self.grid[y][x]
-        if left_click:
+        if left_click and not pause:
             # If player left-clicked of the grid
             reward += selected.revealGrid()
             # Toggle flag off
@@ -196,15 +205,22 @@ class Game:
             if selected.val == -1:
                 self.game_state = "Game Over"
                 selected.mineClicked = True
-        elif right_click:
+        elif right_click and not pause:
             # If the player right-clicked
             if not selected.clicked:
-                if selected.flag:
-                    selected.flag = False
-                    self.mine_left += 1
-                else:
+                if not selected.flag:
                     selected.flag = True
                     self.mine_left -= 1
+        elif right_click and pause:
+            if selected.flag:
+                selected.flag = False
+                self.mine_left += 1
+        elif left_click and pause:
+            self.round_not_clicked += 1
+            if self.round_not_clicked == 10:
+                reward -= 10
+                self.round_not_clicked = 0
+
         # Check if won
         w = True
         for i in self.grid:
@@ -243,7 +259,7 @@ class Game:
         # self.timer.tick(15)  # Tick fps
 
 
-if __name__ == "__main__":
+'''if __name__ == "__main__":
     game_1 = Game()
     game_1.reset()
     while True:
@@ -251,6 +267,5 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
-        game_1.play_step((9, 1, 1))
-        # pygame.display.update()
-        game_1.timer.tick(15)
+        game_1.play_step((9, 1, 1, 0))
+        game_1.timer.tick(15)'''
