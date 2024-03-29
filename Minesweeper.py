@@ -74,24 +74,27 @@ class Grid:
                     self.game.gameDisplay.blit(spr_grid, self.rect)
 
     def revealGrid(self):
+        if self.clicked:
+            return - 5
         self.clicked = True
-        # Auto reveal if it's a 0
-        if self.val == 0:
-            for x in range(-1, 2):
-                if self.xGrid + x >= 0 and self.xGrid + x < self.game.game_width_height:
-                    for y in range(-1, 2):
-                        if self.yGrid + y >= 0 and self.yGrid + y < self.game.game_width_height:
-                            self.game.grid[self.yGrid + y][self.xGrid + x].free += 1
-                            if not self.game.grid[self.yGrid + y][self.xGrid + x].clicked:
-                                self.game.grid[self.yGrid + y][self.xGrid + x].revealGrid()
-            return 10
-        elif self.val == -1:
+        if self.val == -1:
             # Auto reveal all mines if it's a mine
             for m in self.game.mines:
                 if not self.game.grid[m[1]][m[0]].clicked:
                     self.game.grid[m[1]][m[0]].revealGrid()
             return - 10
-        return 0
+        else:
+            # Update the free variable of the grid around
+            for x in range(-1, 2):
+                if self.xGrid + x >= 0 and self.xGrid + x < self.game.game_width_height:
+                    for y in range(-1, 2):
+                        if not (y == 0 and x == 0):
+                            if self.yGrid + y >= 0 and self.yGrid + y < self.game.game_width_height:
+                                self.game.grid[self.yGrid + y][self.xGrid + x].free += 1
+                                if self.val == 0:
+                                    if not self.game.grid[self.yGrid + y][self.xGrid + x].clicked:
+                                        self.game.grid[self.yGrid + y][self.xGrid + x].revealGrid()
+            return 10
 
     def updateValue(self):
         # Update the value when all grid is generated
@@ -102,8 +105,6 @@ class Grid:
                         if self.yGrid + y >= 0 and self.yGrid + y < self.game.game_width_height:
                             if self.game.grid[self.yGrid + y][self.xGrid + x].val == -1:
                                 self.val += 1
-                            if self.game.grid[self.yGrid + y][self.xGrid + x].clicked:
-                                self.free += 1
 
 
 BG_COLOR = (192, 192, 192)
@@ -178,11 +179,15 @@ class Game:
                 j.updateValue()
 
         # Reveal the first grid
+        revealed = False
         for y in range(self.game_width_height):
             for x in range(self.game_width_height):
                 if self.grid[y][x].val != -1:
                     self.grid[y][x].revealGrid()
+                    revealed = True
                     break
+            if revealed:
+                break
 
     def play_step(self, action):
         self.gameDisplay.fill(self.bg_color)  # Fill the screen with bg color
