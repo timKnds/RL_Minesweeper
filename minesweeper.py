@@ -64,34 +64,40 @@ class Minesweeper:
             self.generate_field(action)
         state = self.playerfield.flatten()
         minefield_state = self.minefield.flatten()
-        state[action] = minefield_state[action]
-        num_hidden_tiles = np.count_nonzero(state == 9)
-        if state[action] == -1:
-            # Tile was a hidden mine, game over
-            done = True
-            self.explosion = True
-            reward = -1
-            score = 0  # Hitting mine should not subtract points from score
-        elif num_hidden_tiles == self.mine_count:
-            # The player has won by revealing all non-mine tiles
-            done = True
-            reward = 1.0
-            score = 1
-        elif state[action] == 0:
-            # The tile was a zero, run auto-reveal routine
-            state, score = self.auto_reveal_tiles(action)
+        if state[action] == minefield_state[action]:
+            # Tile has already been revealed
+            reward = -0.1
+            score = 0
+            done = False
+        else:
+            state[action] = minefield_state[action]
             num_hidden_tiles = np.count_nonzero(state == 9)
-            if num_hidden_tiles == self.mine_count:
+            if state[action] == -1:
+                # Tile was a hidden mine, game over
+                done = True
+                self.explosion = True
+                reward = -1
+                score = 0  # Hitting mine should not subtract points from score
+            elif num_hidden_tiles == self.mine_count:
+                # The player has won by revealing all non-mine tiles
                 done = True
                 reward = 1.0
+                score = 1
+            elif state[action] == 0:
+                # The tile was a zero, run auto-reveal routine
+                state, score = self.auto_reveal_tiles(action)
+                num_hidden_tiles = np.count_nonzero(state == 9)
+                if num_hidden_tiles == self.mine_count:
+                    done = True
+                    reward = 1.0
+                else:
+                    done = False
+                    reward = 0.1
             else:
+                # Player has revealed a non-mine tile, but has not won yet
                 done = False
                 reward = 0.1
-        else:
-            # Player has revealed a non-mine tile, but has not won yet
-            done = False
-            reward = 0.1
-            score = 1
+                score = 1
         # Update environment parameters
         state = state.reshape(self.rowdim, self.coldim)
         self.playerfield = state
@@ -119,7 +125,7 @@ class Minesweeper:
         idx_x, idx_y = np.unravel_index(action, (self.rowdim, self.coldim))
         num_mines = 0
         while num_mines < self.mine_count:
-            x_rand = self.np_random.randint(0,self.rowdim)        
+            x_rand = self.np_random.randint(0,self.rowdim)
             y_rand = self.np_random.randint(0,self.coldim)
             # Reserve a mine-free tile for the player's first move
             if (x_rand, y_rand) != (idx_x,idx_y):
@@ -241,8 +247,8 @@ class Minesweeper:
         self.gameDisplay.fill(pygame.Color('black'))  # Clear screen
         self.gameDisplay.blit(text_move, (40, self.game_height+0))
         self.gameDisplay.blit(text_move_number, (160, self.game_height+0))
-        self.gameDisplay.blit(text_score, (300, self.game_height+0))
-        self.gameDisplay.blit(text_score_number, (450, self.game_height+0))
+        # self.gameDisplay.blit(text_score, (300, self.game_height+0))
+        # self.gameDisplay.blit(text_score_number, (450, self.game_height+0))
         if self.done:
             if self.explosion:
                 self.gameDisplay.blit(text_defeat, (700, self.game_height+5))
