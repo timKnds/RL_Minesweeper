@@ -3,11 +3,11 @@ import random
 import numpy as np
 from collections import deque
 import pygame
-import torch.multiprocessing as mps
+# import torch.multiprocessing as mps
 
 from minesweeper import Minesweeper
 from model import Linear_QNet, QTrainer
-from helper import plot
+# from helper import *
 
 pygame.init()
 
@@ -15,6 +15,7 @@ MAX_SIZE = 1_000_000
 BATCH = 1_000
 LR = 0.001
 EPSILON_MIN = 0.01
+
 
 class Agent:
     def __init__(self, model, device):
@@ -24,29 +25,23 @@ class Agent:
         self.memory = deque(maxlen=MAX_SIZE)
         self.reward = 0
         self.done = False
-        # self.x_model = Linear_QNet(22,  20)
-        # self.y_model = Linear_QNet(22, 20)
         self.device = device
         self.model = model
         self.model.to(device=device)
         # self.model.share_memory()
         self.trainer = QTrainer(LR, self.gamma, self.model, self.device)
 
-    def get_action(self, state, n_games):
+    def get_action(self, state):
         if self.epsilon > EPSILON_MIN:
             self.epsilon -= 0.0005
-        final_move = torch.tensor(random.randint(0, 255))
         if random.random() > self.epsilon:
             state0 = torch.tensor(state, dtype=torch.float, device=self.device)
-            # state0 = torch.unsqueeze(state0, 0)
-            final_move = self.model(state0)
-            final_move = torch.round(final_move.cpu(), decimals=0)
-            final_move = torch.tensor(final_move.item(), dtype=torch.int32)
-            final_move = final_move.item()
-            if final_move > 255:
-                final_move = 255
+            pred = self.model(state0)
+            move = torch.argmax(pred)
+        else:
+            move = torch.tensor(random.randint(0, 255))
 
-        return final_move
+        return move.cpu()
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append([state, action, reward, next_state, done])
@@ -82,14 +77,15 @@ def train(model, shape):
     else:
         mps_device = torch.device("mps")
 
-    plot_scores = []
-    plot_mean_scores = []
-    total_score = 0
+    scores = deque(maxlen=100)
+    wins = deque(maxlen=100)
+    # plot_action = []
     record = 0
-    reward = 0
+    # reward = 0
     agent = Agent(model, mps_device)
     game = Minesweeper(shape[0], shape[1], mine_count=shape[2], gui=True)
     old_state = game.reset()
+    action = 0
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -97,7 +93,7 @@ def train(model, shape):
                 quit()
         done = False
         if not done:
-            action = agent.get_action(old_state, agent.n_games)
+            action = agent.get_action(old_state)
             new_state, reward, done = game.step(action)
             game.render()
             # game.timer.tick(15)
@@ -107,25 +103,29 @@ def train(model, shape):
 
         if done:
             game.plot_minefield(action)
+            if not game.explosion:
+                wins.append(1)
+            else:
+                wins.append(0)
+            win_rate = sum(wins) / len(wins)
             game.reset()
             agent.n_games += 1
+            scores.append(game.score)
+            mean_score = sum(scores) / agent.n_games
             agent.train_long_memory()
-            print(f'Game {agent.n_games}, Score: {game.score}, Record: {record}')
+            print(f'Game {agent.n_games}\t Score: {game.score}\t Record: {record}\t Win Rate: {win_rate}\t '
+                  f'Average Score: {mean_score:.3g}\t Epsilon: {agent.epsilon:.3g}')
             if game.score > record:
                 record = game.score
                 agent.model.save()
-            plot_scores.append(game.score)
-            total_score += game.score
-            mean_score = total_score / agent.n_games
-            plot_mean_scores.append(mean_score)
-            plot(plot_scores, plot_mean_scores)
 
 
 if __name__ == '__main__':
     shape = (16, 16, 20)
 
-    model = Linear_QNet(1, 1, shape)
-    model.share_memory()
+    model = Linear_QNet(1, 256, shape)
+    # model.load_state_dict(torch.load("rl_agent.pth"))
+    # model.share_memory()
 
     train(model, shape)
     # num_processes = 3
