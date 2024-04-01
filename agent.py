@@ -36,10 +36,11 @@ class Agent:
             self.epsilon -= 0.0005
         if random.random() > self.epsilon:
             state0 = torch.tensor(state, dtype=torch.float, device=self.device)
+            state0 = state0.unsqueeze(0)
             pred = self.model(state0)
             move = torch.argmax(pred)
         else:
-            move = torch.tensor(random.randint(0, 255))
+            move = torch.tensor(random.randint(0, 80))
 
         return move.cpu()
 
@@ -113,7 +114,7 @@ def train(model, shape):
             scores.append(game.score)
             mean_score = sum(scores) / agent.n_games
             agent.train_long_memory()
-            print(f'Game {agent.n_games}\t Score: {game.score}\t Record: {record}\t Win Rate: {win_rate}\t '
+            print(f'Game {agent.n_games}\t Score: {game.score}\t Record: {record}\t Win Rate: {win_rate:.3g}\t '
                   f'Average Score: {mean_score:.3g}\t Epsilon: {agent.epsilon:.3g}')
             if game.score > record:
                 record = game.score
@@ -121,9 +122,9 @@ def train(model, shape):
 
 
 if __name__ == '__main__':
-    shape = (16, 16, 20)
+    shape = (9, 9, 10)
 
-    model = Linear_QNet(1, 256, shape)
+    model = Linear_QNet(1, shape[0] * shape[1], shape)
     # model.load_state_dict(torch.load("rl_agent.pth"))
     # model.share_memory()
 

@@ -9,17 +9,22 @@ class Linear_QNet(nn.Module):
         super().__init__()
         # output_shape = (128, 16, 16)
         self.conv1 = nn.Conv2d(input_channels, 128, kernel_size=5, stride=1, padding=2,
-                               padding_mode='replicate', bias=True)
+                               padding_mode='replicate', bias=False)
         # add batch normalization
         self.batch_norm1 = nn.BatchNorm2d(128)
         # output_shape = (128, 14, 14)
-        self.conv2 = nn.Conv2d(128, 128, kernel_size=5, stride=1, padding=2,
+        self.conv2 = nn.Conv2d(128, 256, kernel_size=5, stride=1, padding=2,
                                padding_mode='replicate', bias=False)
-        self.batch_norm2 = nn.BatchNorm2d(128)
+        self.batch_norm2 = nn.BatchNorm2d(256)
         # output_shape = (64, 13, 13)
-        self.conv3 = nn.Conv2d(128, 64, kernel_size=5, stride=1, padding=2,
+        self.conv3 = nn.Conv2d(256, 256, kernel_size=5, stride=1, padding=2,
                                padding_mode='replicate', bias=False)
-        self.batch_norm3 = nn.BatchNorm2d(64)
+        self.batch_norm3 = nn.BatchNorm2d(256)
+        self.conv4 = nn.Conv2d(256, 128, kernel_size=5, stride=1, padding=2,
+                               padding_mode='replicate', bias=False)
+        self.batch_norm4 = nn.BatchNorm2d(128)
+        self.conv5 = nn.Conv2d(128, 64, kernel_size=5, stride=1, padding=2,
+                               padding_mode='replicate', bias=False)
         self.fc1 = nn.Linear(shape[0] * shape[1] * 64, 512)
         self.fc2 = nn.Linear(512, output_channels)
 
@@ -28,15 +33,27 @@ class Linear_QNet(nn.Module):
         # self.linear3 = nn.Linear(4 * output_size, output_size)
 
     def forward(self, x):
-        x = F.relu(self.conv1(x))
-        x = F.relu(self.conv2(x))
-        x = F.relu(self.conv3(x))
+        x = self.conv1(x)
+        # x = F.relu(x)
+        x = self.batch_norm1(x)
+        x = self.conv2(x)
+        x = F.relu(x)
+        x = self.batch_norm2(x)
+        x = self.conv3(x)
+        x = F.relu(x)
+        x = self.batch_norm3(x)
+        x = self.conv4(x)
+        x = F.relu(x)
+        x = self.batch_norm4(x)
+        x = self.conv5(x)
+        x = F.relu(x)
         # x = x.reshape(x.shape[0], -1)
         if len(x.shape) == 4:
             x = x.view(x.size(0), -1)
         else:
             x = torch.flatten(x)
-        x = F.relu(self.fc1(x))
+        x = self.fc1(x)
+        x = F.relu(x)
         x = self.fc2(x)
         return x
 

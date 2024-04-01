@@ -76,7 +76,7 @@ class Minesweeper:
                 # Tile was a hidden mine, game over
                 done = True
                 self.explosion = True
-                reward = -1
+                reward = -3
                 score = 0  # Hitting mine should not subtract points from score
             elif num_hidden_tiles == self.mine_count:
                 # The player has won by revealing all non-mine tiles
@@ -92,11 +92,11 @@ class Minesweeper:
                     reward = 1.0
                 else:
                     done = False
-                    reward = 0.1
+                    reward = 0.2
             else:
                 # Player has revealed a non-mine tile, but has not won yet
                 done = False
-                reward = 0.1
+                reward = 0.2
                 score = 1
         # Update environment parameters
         state = state.reshape(self.rowdim, self.coldim)
