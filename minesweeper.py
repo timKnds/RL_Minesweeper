@@ -54,7 +54,7 @@ class Minesweeper:
         self.score = 0
         self.np_random = np.random.RandomState()  # For seeding the environment
         self.move_num = 0  # Track number of player moves per game
-        self.win = False
+        # self.win = False
         if gui:
             self.init_gui()  # Pygame related parameters
 
@@ -77,11 +77,10 @@ class Minesweeper:
                 # Tile was a hidden mine, game over
                 done = True
                 self.explosion = True
-                reward = -3
+                reward = -1.0
                 score = 0  # Hitting mine should not subtract points from score
             elif num_hidden_tiles == self.mine_count:
                 # The player has won by revealing all non-mine tiles
-                self.win = True
                 done = True
                 reward = 1.0
                 score = 1
@@ -148,9 +147,7 @@ class Minesweeper:
         # The first move is automatically played by the environment, and is 
         # guaranteed to not contain a mine. Assign the value of this tile to 
         # the game state
-        x_coord = int(0)
-        y_coord = int((self.coldim/2)-1)
-        action_idx = np.ravel_multi_index((x_coord, y_coord), (self.rowdim, self.coldim))
+        action_idx = self.np_random.randint(0, self.rowdim*self.coldim-1)
         state, reward, done = self.step(action_idx)
         return state
 
