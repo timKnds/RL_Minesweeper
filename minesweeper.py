@@ -54,6 +54,7 @@ class Minesweeper:
         self.score = 0
         self.np_random = np.random.RandomState()  # For seeding the environment
         self.move_num = 0  # Track number of player moves per game
+        self.win = False
         if gui:
             self.init_gui()  # Pygame related parameters
 
@@ -80,6 +81,7 @@ class Minesweeper:
                 score = 0  # Hitting mine should not subtract points from score
             elif num_hidden_tiles == self.mine_count:
                 # The player has won by revealing all non-mine tiles
+                self.win = True
                 done = True
                 reward = 1.0
                 score = 1
@@ -113,6 +115,7 @@ class Minesweeper:
         self.move_num = 0
         self.explosion = False
         self.done = False
+        self.win = False
         self.minefield = np.zeros((self.rowdim, self.coldim), dtype='int')
         self.playerfield = np.ones((self.rowdim, self.coldim), dtype='int')*9
         state = self.play_first_move()
@@ -128,12 +131,12 @@ class Minesweeper:
             x_rand = self.np_random.randint(0,self.rowdim)
             y_rand = self.np_random.randint(0,self.coldim)
             # Reserve a mine-free tile for the player's first move
-            if (x_rand, y_rand) != (idx_x,idx_y):
-                if self.minefield[x_rand,y_rand] != -1:
-                    self.minefield[x_rand,y_rand] = -1
+            if (x_rand, y_rand) != (idx_x, idx_y):
+                if self.minefield[x_rand, y_rand] != -1:
+                    self.minefield[x_rand, y_rand] = -1
                     num_mines += 1
-                    for k in range(-1,2):
-                        for h in range(-1,2):
+                    for k in range(-1, 2):
+                        for h in range(-1, 2):
                             try:
                                 if self.minefield[x_rand+k, y_rand+h] != -1:
                                     if x_rand+k > -1 and y_rand+h > -1:

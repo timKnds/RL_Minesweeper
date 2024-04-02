@@ -14,7 +14,7 @@ pygame.init()
 MAX_SIZE = 1_000_000
 BATCH = 1_000
 LR = 0.001
-EPSILON_MIN = 0.01
+EPSILON_MIN = 0.001
 
 
 class Agent:
@@ -33,7 +33,7 @@ class Agent:
 
     def get_action(self, state):
         if self.epsilon > EPSILON_MIN:
-            self.epsilon -= 0.0005
+            self.epsilon -= 0.001
         if random.random() > self.epsilon:
             state0 = torch.tensor(state, dtype=torch.float, device=self.device)
             state0 = state0.unsqueeze(0)
@@ -102,21 +102,23 @@ def train(model, shape):
 
             agent.remember(old_state, action, reward, new_state, done)
 
+            old_state = new_state
+
         if done:
             game.plot_minefield(action)
-            if not game.explosion:
+            if game.win:
                 wins.append(1)
             else:
                 wins.append(0)
             win_rate = sum(wins) / len(wins)
-            game.reset()
+            old_state = game.reset()
             agent.n_games += 1
             scores.append(game.score)
             mean_score = sum(scores) / agent.n_games
             agent.train_long_memory()
             print(f'Game {agent.n_games}\t Score: {game.score}\t Record: {record}\t Win Rate: {win_rate:.3g}\t '
                   f'Average Score: {mean_score:.3g}\t Epsilon: {agent.epsilon:.3g}')
-            if game.score > record:
+            if game.score >= record:
                 record = game.score
                 agent.model.save()
 
