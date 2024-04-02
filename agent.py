@@ -21,7 +21,7 @@ class Agent:
     def __init__(self, model, device):
         self.n_games = 0
         self.epsilon = 0.99
-        self.gamma = 0.9
+        self.gamma = 0.5
         self.memory = deque(maxlen=MAX_SIZE)
         self.reward = 0
         self.done = False
@@ -105,22 +105,22 @@ def train(model, shape):
             old_state = new_state
 
         if done:
-            game.plot_minefield(action)
-            if game.win:
+            agent.n_games += 1
+            scores.append(game.score)
+            mean_score = sum(scores) / len(scores)
+            if not game.explosion:
                 wins.append(1)
             else:
                 wins.append(0)
             win_rate = sum(wins) / len(wins)
-            old_state = game.reset()
-            agent.n_games += 1
-            scores.append(game.score)
-            mean_score = sum(scores) / agent.n_games
-            agent.train_long_memory()
             print(f'Game {agent.n_games}\t Score: {game.score}\t Record: {record}\t Win Rate: {win_rate:.3g}\t '
                   f'Average Score: {mean_score:.3g}\t Epsilon: {agent.epsilon:.3g}')
+            game.plot_minefield(action)
+            agent.train_long_memory()
             if game.score >= record:
                 record = game.score
                 agent.model.save()
+            old_state = game.reset()
 
 
 if __name__ == '__main__':
