@@ -20,8 +20,8 @@ EPSILON_MIN = 0.001
 class Agent:
     def __init__(self, model, device):
         self.n_games = 0
-        self.epsilon = 0.99
-        self.gamma = 0.5
+        self.epsilon = 0.90
+        self.gamma = 0.2
         self.memory = deque(maxlen=MAX_SIZE)
         self.reward = 0
         self.done = False
