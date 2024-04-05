@@ -1,11 +1,10 @@
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
 
-class Linear_QNet(nn.Module):
-    def __init__(self, input_channels, output_channels, shape):
+class Deep_QNet(nn.Module):
+    def __init__(self, input_channels, shape):
         super().__init__()
         # output_shape = (128, 16, 16)
         self.conv1 = nn.Conv2d(input_channels, 128, kernel_size=3, stride=1, padding=1,
@@ -24,7 +23,7 @@ class Linear_QNet(nn.Module):
                                padding_mode='zeros', bias=True)
         # self.pool = nn.MaxPool2d(kernel_size=2, stride=2, padding=1)
         self.fc1 = nn.Linear(shape[0] * shape[1] * 32, 512)
-        self.fc2 = nn.Linear(512, output_channels)
+        self.fc2 = nn.Linear(512, shape[0] * shape[1])
 
         # self.linear1 = nn.Linear(input_size, 4 * input_size)
         # self.linear2 = nn.Linear(4 * input_size, 4 * output_size)
@@ -51,52 +50,8 @@ class Linear_QNet(nn.Module):
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc2(x)
+        x = F.softmax(x, dim=1)
         return x
 
     def save(self, name="rl_agent.pth"):
         torch.save(self.state_dict(), name)
-
-
-class QTrainer:
-    def __init__(self, learning_rate, gamma, model, device):
-        self.lr = learning_rate
-        self.gamma = gamma
-        self.model = model
-        # self.x_model = x_model
-        # self.y_model = y_model
-        self.optimizer = torch.optim.Adam(model.parameters(), lr=self.lr)
-        self.criterion = nn.MSELoss()
-        self.device = device
-
-    def train_step(self, state, action, reward, next_state, done):
-        state = torch.tensor(state, dtype=torch.float, device=self.device)
-        next_state = torch.tensor(next_state, dtype=torch.float, device=self.device)
-        # action = torch.tensor(action, dtype=torch.long, device=self.device)
-        reward = torch.tensor(reward, dtype=torch.float, device=self.device)
-
-        if len(state.shape) == 3:
-            reward = torch.unsqueeze(reward, 0)
-            done = (done, )
-            state = torch.unsqueeze(state, 0)
-            next_state = torch.unsqueeze(next_state, 0)
-            action = torch.unsqueeze(action, 0)
-
-        # predict th
-        current_qs_list = self.model(state)
-        future_qs_list = self.model(next_state)
-
-        target = current_qs_list.clone()
-        for idx in range(len(done)):
-            if not done[idx]:
-                max_future_q = torch.max(future_qs_list[idx])
-                Q_new = reward[idx] + self.gamma * max_future_q
-            else:
-                Q_new = reward[idx]
-
-            target[idx][action[idx]] = Q_new
-
-        self.optimizer.zero_grad()
-        loss = self.criterion(target, current_qs_list)
-        loss.backward()
-
-        self.optimizer.step()
