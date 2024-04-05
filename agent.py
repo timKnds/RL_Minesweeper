@@ -82,7 +82,7 @@ class Agent:
         new_current_states = np.array([sample[3] for sample in mini_sample])
         future_qs = self.target_model(torch.tensor(new_current_states, dtype=torch.float, device=self.device))
 
-        X, y = [], []
+        X, y = torch.empty((len(mini_sample), 16)), torch.empty((len(mini_sample), 16))
 
         for index, (state, action, reward, next_state, done) in enumerate(mini_sample):
             if not done:
@@ -91,14 +91,14 @@ class Agent:
             else:
                 new_q = reward
 
-            current_q = current_qs[index]
+            current_q = current_qs[index].clone()
             current_q[action] = new_q
 
-            X.append(state.reshape(-1))
-            y.append(current_q.detach().cpu())
+            X[index] = (torch.tensor(state.reshape(-1), device=self.device))
+            y[index] = current_q
 
         self.optimizer.zero_grad()
-        loss = self.criterion(np.array(X, dtype=np.float32), np.array(y, dtype=np.float32))
+        loss = self.criterion(X, y)
         loss.backward()
         self.optimizer.step()
 
