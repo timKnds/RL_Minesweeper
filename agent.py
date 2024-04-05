@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 import random
 import numpy as np
 from collections import deque
@@ -6,65 +7,113 @@ import pygame
 # import torch.multiprocessing as mps
 
 from minesweeper import Minesweeper
-from model import Linear_QNet, QTrainer
-# from helper import *
+from model import Deep_QNet
 
 pygame.init()
 
 MAX_SIZE = 1_000_000
 BATCH = 1_000
-LR = 0.001
+
+LR = 0.01
+LR_DECAY = 0.99975
+LR_MIN = 0.0001
+
+EPSILON = 0.9
+EPSILON_DECAY = 0.99975
 EPSILON_MIN = 0.001
+
+GAMMA = 0.9
+
+UPDATE_TARGET_EVERY = 5
 
 
 class Agent:
-    def __init__(self, model, device):
+    def __init__(self, device, shape):
         self.n_games = 0
-        self.epsilon = 0.90
-        self.gamma = 0.2
+        self.update_counter = 0
+        self.epsilon = EPSILON
+        self.lr = LR
         self.memory = deque(maxlen=MAX_SIZE)
         self.reward = 0
         self.done = False
         self.device = device
-        self.model = model
+        self.model = Deep_QNet(1, shape)
         self.model.to(device=device)
+        self.target_model = Deep_QNet(1, shape)
+        self.target_model.to(device=device)
+        self.target_model.load_state_dict(self.model.state_dict())
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
+        self.criterion = nn.MSELoss()
         # self.model.share_memory()
-        self.trainer = QTrainer(LR, self.gamma, self.model, self.device)
+
+    def get_state(self, game):
+        state = np.expand_dims(game.playerfield, axis=0)
+        state = state / 8
+        return state
 
     def get_action(self, state):
         if self.epsilon > EPSILON_MIN:
-            self.epsilon -= 0.001
+            self.epsilon -= 0.0005
         if random.random() > self.epsilon:
             state0 = torch.tensor(state, dtype=torch.float, device=self.device)
             state0 = state0.unsqueeze(0)
             pred = self.model(state0)
+            # Set pred to minimum value if the move is already revealed
+            pred[0, state0.reshape(-1) != -0.125] = torch.min(pred)
             move = torch.argmax(pred)
         else:
-            move = torch.tensor(random.randint(0, 80))
+            unsolved = [i for i, x in enumerate(state.reshape(-1)) if x == -0.125]
+            move = torch.tensor(random.choice(unsolved))
 
         return move.cpu()
 
     def remember(self, state, action, reward, next_state, done):
         self.memory.append([state, action, reward, next_state, done])
 
-    def train_long_memory(self):
+    def train_step(self, done):
         if len(self.memory) > BATCH:
             mini_sample = random.sample(self.memory, BATCH)
         else:
             mini_sample = self.memory
 
-        states, actions, rewards, next_states, dones = zip(*mini_sample)
-        states = np.asarray(states)
-        actions = np.asarray(actions)
-        rewards = np.asarray(rewards)
-        next_states = np.asarray(next_states)
-        self.trainer.train_step(states, actions, rewards, next_states, dones)
+        current_states = np.array([sample[0] for sample in mini_sample])
+        current_qs = self.model(torch.tensor(current_states, dtype=torch.float, device=self.device))
 
-    def train_short_memory(self, state, action, reward, next_state, done):
-        self.trainer.train_step(state, action, reward, next_state, done)
+        new_current_states = np.array([sample[3] for sample in mini_sample])
+        future_qs = self.target_model(torch.tensor(new_current_states, dtype=torch.float, device=self.device))
+
+        X, y = [], []
+
+        for index, (state, action, reward, next_state, done) in enumerate(mini_sample):
+            if not done:
+                max_future_q = torch.max(future_qs[index])
+                new_q = reward + GAMMA * max_future_q
+            else:
+                new_q = reward
+
+            current_q = current_qs[index]
+            current_q[action] = new_q
+
+            X.append(state.reshape(-1))
+            y.append(current_q.detach().cpu())
+
+        self.optimizer.zero_grad()
+        loss = self.criterion(np.array(X, dtype=np.float32), np.array(y, dtype=np.float32))
+        loss.backward()
+        self.optimizer.step()
+
+        if done:
+            self.update_counter += 1
+
+        if self.update_counter > UPDATE_TARGET_EVERY:
+            self.target_model.load_state_dict(self.model.state_dict())
+            self.update_counter = 0
+
+        self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
+        self.lr = max(LR, self.lr * LR_DECAY)
 
 
-def train(model, shape):
+def train(shape):
     # device agnostic code
     if not torch.backends.mps.is_available():
         mps_device = torch.device("cpu")
@@ -80,10 +129,8 @@ def train(model, shape):
 
     scores = deque(maxlen=100)
     wins = deque(maxlen=100)
-    # plot_action = []
     record = 0
-    # reward = 0
-    agent = Agent(model, mps_device)
+    agent = Agent(mps_device, shape)
     game = Minesweeper(shape[0], shape[1], mine_count=shape[2], gui=True)
     old_state = game.reset()
     action = 0
@@ -93,16 +140,18 @@ def train(model, shape):
                 pygame.quit()
                 quit()
         done = False
+        game_reward = 0
         if not done:
             action = agent.get_action(old_state)
             new_state, reward, done = game.step(action)
             game.render()
-            # game.timer.tick(15)
-            agent.train_short_memory(old_state, action, reward, new_state, done)
 
             agent.remember(old_state, action, reward, new_state, done)
 
+            agent.train_step(done)
+
             old_state = new_state
+            game_reward += reward
 
         if done:
             agent.n_games += 1
@@ -114,9 +163,9 @@ def train(model, shape):
                 wins.append(0)
             win_rate = sum(wins) / len(wins)
             print(f'Game {agent.n_games}\t Score: {game.score}\t Record: {record}\t Win Rate: {win_rate:.3g}\t '
-                  f'Average Score: {mean_score:.3g}\t Epsilon: {agent.epsilon:.3g}')
+                  f'Average Score: {mean_score:.3g}\t Epsilon: {agent.epsilon:.3g}\t '
+                  f'Moves: {game.move_num}, Reward: {game_reward}')
             game.plot_minefield(action)
-            agent.train_long_memory()
             if game.score >= record:
                 record = game.score
                 agent.model.save()
@@ -124,13 +173,12 @@ def train(model, shape):
 
 
 if __name__ == '__main__':
-    shape = (9, 9, 10)
+    shape = (4, 4, 3)
 
-    model = Linear_QNet(1, shape[0] * shape[1], shape)
     # model.load_state_dict(torch.load("rl_agent.pth"))
     # model.share_memory()
 
-    train(model, shape)
+    train(shape)
     # num_processes = 3
     # processes = []
     # for rank in range(num_processes):
