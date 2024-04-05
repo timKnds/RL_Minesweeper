@@ -3,7 +3,6 @@
 
 import pygame
 import numpy as np
-from collections import deque
 
 # Import files
 spr_emptyGrid = pygame.image.load("Sprites/empty.png")
@@ -106,7 +105,7 @@ class Minesweeper:
         self.minefield = np.zeros((self.nrows, self.ncols), dtype='int')
         self.playerfield = np.ones((self.nrows, self.ncols), dtype='int') * -1
         return self.play_first_move()
-        
+
     def get_state(self):
         state = np.expand_dims(self.playerfield, axis=0)
         state = state / 8
@@ -198,24 +197,12 @@ class Minesweeper:
         self.selectionSurface.set_alpha(128)  # Opacity from 255 (opaque) to 0 (transparent)
         self.selectionSurface.fill((245, 245, 66))  # Yellow
 
-    def render(self, valid_qvalues=np.array([])):
+    def render(self):
         # Update the game display after every agent action
         # Accepts a masked array of Q-values to plot as an overlay on the GUI
         # Update and blit text
-        text_victory = self.myfont.render('VICTORY!', True, self.victory_color)
-        text_defeat = self.myfont.render('DEFEAT!', True, self.defeat_color)
         self.gameDisplay.fill(pygame.Color('black'))  # Clear screen
-        # if self.done:
-        #     if self.explosion:
-        #         self.gameDisplay.blit(text_defeat, (700, self.game_height+5))
-        #     else:
-        #         self.gameDisplay.blit(text_victory, (700, self.game_height+5))
-        # Blit updated view of minefield
         self.plot_playerfield()
-        # if valid_qvalues.size > 0:
-        #     # Blit surface showing agent selection and Q-value representations
-        #     self.selection_animation(np.argmax(valid_qvalues))
-        #     self.plot_qvals(valid_qvalues)
         self.update_screen()
 
     def plot_playerfield(self):
@@ -240,7 +227,8 @@ class Minesweeper:
                 for h in range(0, self.ncols):
                     if self.minefield[k, h] == -1:
                         # Only blit mines
-                        self.gameDisplay.blit(self.tile_dict[self.minefield[k, h]], (h*self.tile_coldim, k*self.tile_rowdim))
+                        self.gameDisplay.blit(self.tile_dict[self.minefield[k, h]],
+                                              (h*self.tile_coldim, k*self.tile_rowdim))
             # Plot game-ending mine with red background color
             if self.explosion:
                 self.gameDisplay.blit(self.tileexplode, (col_idx*self.tile_coldim, row_idx*self.tile_rowdim))
@@ -248,7 +236,8 @@ class Minesweeper:
             # Plot for debug purposes        
             for k in range(0, self.nrows):
                 for h in range(0, self.ncols):
-                    self.gameDisplay.blit(self.tile_dict[self.minefield[k, h]], (h*self.tile_coldim, k*self.tile_rowdim))
+                    self.gameDisplay.blit(self.tile_dict[self.minefield[k, h]],
+                                          (h*self.tile_coldim, k*self.tile_rowdim))
         self.update_screen()
 
     def update_screen(self):
