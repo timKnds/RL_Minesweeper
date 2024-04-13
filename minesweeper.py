@@ -3,6 +3,7 @@
 
 import pygame
 import numpy as np
+import pandas as pd
 
 # Import files
 spr_emptyGrid = pygame.image.load("Sprites/empty.png")
@@ -186,7 +187,7 @@ class Minesweeper:
         self.tile_dict = {-1: self.tilehidden, 0: self.tile0, 1: self.tile1,
                           2: self.tile2, 3: self.tile3, 4: self.tile4, 5: self.tile5,
                           6: self.tile6, 7: self.tile7, 8: self.tile8,
-                          -2: self.tileexplode}
+                          -2: self.tilemine}
         # Set font and font color
         self.myfont = pygame.font.SysFont('Segoe UI', 32)
         self.font_color = (255, 255, 255)  # White
@@ -225,9 +226,9 @@ class Minesweeper:
             row_idx, col_idx = np.unravel_index(action, (self.nrows, self.ncols))
             for k in range(0, self.nrows):
                 for h in range(0, self.ncols):
-                    if self.minefield[k, h] == -1:
+                    if self.minefield[k, h] == -2:
                         # Only blit mines
-                        self.gameDisplay.blit(self.tile_dict[self.minefield[k, h]],
+                        self.gameDisplay.blit(self.tilemine,
                                               (h*self.tile_coldim, k*self.tile_rowdim))
             # Plot game-ending mine with red background color
             if self.explosion:
@@ -245,3 +246,9 @@ class Minesweeper:
     
     def close(self):
         pygame.quit()
+
+    def plot_inline(self):
+        # Initialize inline mode for Jupyter Notebook
+        df = pd.DataFrame(self.playerfield)
+        print(df.to_string(header=False, index=False, col_space=4, justify='center'))
+        print('\n')
