@@ -12,9 +12,10 @@ from model import Deep_QNet
 pygame.init()
 
 MAX_SIZE = 1_000_000
-BATCH = 128
+BATCH = 512
 
 LR = 0.001
+LR_DECAY = 0.99975
 
 EPSILON = 0.9
 EPSILON_DECAY = 0.99975
@@ -106,20 +107,18 @@ class Agent:
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
         # self.lr = max(LR, self.lr * LR_DECAY)
 
-        return loss.item()
-
 
 def train(nrows, ncols, nmines):
     # device agnostic code
     device = torch.device("cuda" if torch.cuda.is_available() else
                           "mps" if torch.backends.mps.is_available() else "cpu")
 
-    scores = deque(maxlen=100)
-    wins = deque(maxlen=100)
-    record = 0
+    scores = deque(maxlen=1000)
+    wins = deque(maxlen=1000)
     agent = Agent(device, nrows=nrows, ncols=ncols)
     game = Minesweeper(nrows=nrows, ncols=ncols, mine_count=nmines, gui=True)
     old_state = game.reset()
+    highest_win_rate = 0
     action = 0
     game_reward = 0
     while True:
@@ -134,7 +133,7 @@ def train(nrows, ncols, nmines):
 
             agent.remember(old_state, action, reward, new_state, done)
 
-            loss = agent.train_step(done)
+            agent.train_step(done)
 
             game.render()
 
@@ -151,29 +150,15 @@ def train(nrows, ncols, nmines):
             else:
                 wins.append(0)
             win_rate = sum(wins) / len(wins)
-            print(f'Game {agent.n_games:<10}\t Score: {game.score:<10}\t Loss: {loss:<10.2f}\t '
+            print(f'Game {agent.n_games:<10}\t Score: {game.score:<10}\t'
                   f'Win Rate: {win_rate:<10.2f}\t '
                   f'Average Score: {mean_score:<10.1f}\t Epsilon: {agent.epsilon:<10.2f}\t '
                   f'Moves: {game.move_num:<10} Reward: {game_reward:.1f}')
-            if game.score >= record:
-                record = game.score
+            if win_rate >= highest_win_rate:
                 agent.model.save()
             old_state = game.reset()
             game_reward = 0
 
 
 if __name__ == '__main__':
-
-    # model.load_state_dict(torch.load("rl_agent.pth"))
-    # model.share_memory()
-
     train(4, 4, 3)
-    # num_processes = 3
-    # processes = []
-    # for rank in range(num_processes):
-    #     p = mps.Process(target=train, args=(model, shape))
-    #     print(f"Process {rank} started")
-    #     p.start()
-    #     processes.append(p)
-    # for p in processes:
-    #     p.join()
