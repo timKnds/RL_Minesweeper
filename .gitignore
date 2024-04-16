@@ -10,3 +10,5 @@
 
 # OS generated files
 .DS_Store
+/minesweeper_test.py
+/rl_agent.pth
