@@ -25,7 +25,7 @@ spr_mineFalse = pygame.image.load("Sprites/mineFalse.png")
 class Minesweeper:
 
     def __init__(self, nrows, ncols, mine_count, gui=False):
-        self.reward = {'win': 1.0, 'lose': -1.0, 'progress': 0.3, 'guess': -0.3, 'no_progress': -0.3}
+        self.reward = {'win': 0.1, 'lose': -0.1, 'progress': 0.1, 'guess': -0.1, 'no_progress': -0.1}
         self.nrows = nrows  # number of tiles along the row dimension
         self.ncols = ncols  # number of tiles along the column dimension
         self.mine_count = mine_count
