@@ -4,18 +4,16 @@ import random
 import numpy as np
 from collections import deque
 import pygame
-# import torch.multiprocessing as mps
 
 from minesweeper import Minesweeper
 from model import Deep_QNet
 
 pygame.init()
 
-MAX_SIZE = 1_000_000
+MAX_SIZE = 1000000
 BATCH = 512
 
 LR = 0.001
-LR_DECAY = 0.99975
 
 EPSILON = 0.9
 EPSILON_DECAY = 0.99975
@@ -43,7 +41,6 @@ class Agent:
         self.target_model.load_state_dict(self.model.state_dict())
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
         self.criterion = nn.MSELoss()
-        # self.model.share_memory()
 
     def get_state(self, game):
         state = np.expand_dims(game.playerfield, axis=0)
@@ -105,7 +102,6 @@ class Agent:
             self.update_counter = 0
 
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
-        # self.lr = max(LR, self.lr * LR_DECAY)
 
 
 def train(nrows, ncols, nmines):
