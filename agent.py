@@ -14,9 +14,7 @@ pygame.init()
 MAX_SIZE = 1_000_000
 BATCH = 128
 
-LR = 0.01
-LR_DECAY = 0.99975
-LR_MIN = 0.0001
+LR = 0.001
 
 EPSILON = 0.9
 EPSILON_DECAY = 0.99975
@@ -82,7 +80,7 @@ class Agent:
         new_current_states = np.array([sample[3] for sample in mini_sample])
         future_qs = self.target_model(torch.tensor(new_current_states, dtype=torch.float, device=self.device))
 
-        X, y = torch.empty((len(mini_sample), 16)), torch.empty((len(mini_sample), 16))
+        y = current_qs.detach().clone()
 
         for index, (state, action, reward, next_state, done) in enumerate(mini_sample):
             if not done:
@@ -91,14 +89,10 @@ class Agent:
             else:
                 new_q = reward
 
-            current_q = current_qs[index].clone()
-            current_q[action] = new_q
-
-            X[index] = (torch.tensor(state.reshape(-1), dtype=torch.float32, device=self.device))
-            y[index] = current_q
+            y[index][action] = new_q
 
         self.optimizer.zero_grad()
-        loss = self.criterion(X, y)
+        loss = self.criterion(current_qs, y)
         loss.backward()
         self.optimizer.step()
 
