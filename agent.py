@@ -12,7 +12,7 @@ from model import Deep_QNet
 pygame.init()
 
 MAX_SIZE = 1_000_000
-BATCH = 1_000
+BATCH = 128
 
 LR = 0.01
 LR_DECAY = 0.99975
@@ -22,13 +22,13 @@ EPSILON = 0.9
 EPSILON_DECAY = 0.99975
 EPSILON_MIN = 0.001
 
-GAMMA = 0.9
+GAMMA = 0.1
 
 UPDATE_TARGET_EVERY = 5
 
 
 class Agent:
-    def __init__(self, device, shape):
+    def __init__(self, device, nrows, ncols):
         self.n_games = 0
         self.update_counter = 0
         self.epsilon = EPSILON
@@ -37,9 +37,9 @@ class Agent:
         self.reward = 0
         self.done = False
         self.device = device
-        self.model = Deep_QNet(1, shape)
+        self.model = Deep_QNet(nrows, ncols)
         self.model.to(device=device)
-        self.target_model = Deep_QNet(1, shape)
+        self.target_model = Deep_QNet(nrows, ncols)
         self.target_model.to(device=device)
         self.target_model.load_state_dict(self.model.state_dict())
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.lr)
@@ -59,7 +59,7 @@ class Agent:
             state0 = state0.unsqueeze(0)
             pred = self.model(state0)
             # Set pred to minimum value if the move is already revealed
-            pred[0, state0.reshape(-1) != -0.125] = torch.min(pred)
+            pred[0, state0.reshape(-1) != -0.125] = -1
             move = torch.argmax(pred)
         else:
             unsolved = [i for i, x in enumerate(state.reshape(-1)) if x == -0.125]
@@ -94,7 +94,7 @@ class Agent:
             current_q = current_qs[index].clone()
             current_q[action] = new_q
 
-            X[index] = (torch.tensor(state.reshape(-1), device=self.device))
+            X[index] = (torch.tensor(state.reshape(-1), dtype=torch.float32, device=self.device))
             y[index] = current_q
 
         self.optimizer.zero_grad()
@@ -110,50 +110,45 @@ class Agent:
             self.update_counter = 0
 
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
-        self.lr = max(LR, self.lr * LR_DECAY)
+        # self.lr = max(LR, self.lr * LR_DECAY)
+
+        return loss.item()
 
 
-def train(shape):
+def train(nrows, ncols, nmines):
     # device agnostic code
-    if not torch.backends.mps.is_available():
-        mps_device = torch.device("cpu")
-        if not torch.backends.mps.is_built():
-            print("MPS not available because the current PyTorch install was not "
-                  "built with MPS enabled.")
-        else:
-            print("MPS not available because the current MacOS version is not 12.3+ "
-                  "and/or you do not have an MPS-enabled device on this machine.")
-
-    else:
-        mps_device = torch.device("mps")
+    device = torch.device("cuda" if torch.cuda.is_available() else
+                          "mps" if torch.backends.mps.is_available() else "cpu")
 
     scores = deque(maxlen=100)
     wins = deque(maxlen=100)
     record = 0
-    agent = Agent(mps_device, shape)
-    game = Minesweeper(shape[0], shape[1], mine_count=shape[2], gui=True)
+    agent = Agent(device, nrows=nrows, ncols=ncols)
+    game = Minesweeper(nrows=nrows, ncols=ncols, mine_count=nmines, gui=True)
     old_state = game.reset()
     action = 0
+    game_reward = 0
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 pygame.quit()
                 quit()
         done = False
-        game_reward = 0
         if not done:
             action = agent.get_action(old_state)
             new_state, reward, done = game.step(action)
-            game.render()
 
             agent.remember(old_state, action, reward, new_state, done)
 
-            agent.train_step(done)
+            loss = agent.train_step(done)
+
+            game.render()
 
             old_state = new_state
             game_reward += reward
 
         if done:
+            game.plot_minefield(action)
             agent.n_games += 1
             scores.append(game.score)
             mean_score = sum(scores) / len(scores)
@@ -162,23 +157,23 @@ def train(shape):
             else:
                 wins.append(0)
             win_rate = sum(wins) / len(wins)
-            print(f'Game {agent.n_games}\t Score: {game.score}\t Record: {record}\t Win Rate: {win_rate:.3g}\t '
-                  f'Average Score: {mean_score:.3g}\t Epsilon: {agent.epsilon:.3g}\t '
-                  f'Moves: {game.move_num}, Reward: {game_reward}')
-            game.plot_minefield(action)
+            print(f'Game {agent.n_games:<10}\t Score: {game.score:<10}\t Loss: {loss:<10.2f}\t '
+                  f'Win Rate: {win_rate:<10.2f}\t '
+                  f'Average Score: {mean_score:<10.1f}\t Epsilon: {agent.epsilon:<10.2f}\t '
+                  f'Moves: {game.move_num:<10} Reward: {game_reward:.1f}')
             if game.score >= record:
                 record = game.score
                 agent.model.save()
             old_state = game.reset()
+            game_reward = 0
 
 
 if __name__ == '__main__':
-    shape = (4, 4, 3)
 
     # model.load_state_dict(torch.load("rl_agent.pth"))
     # model.share_memory()
 
-    train(shape)
+    train(4, 4, 3)
     # num_processes = 3
     # processes = []
     # for rank in range(num_processes):
